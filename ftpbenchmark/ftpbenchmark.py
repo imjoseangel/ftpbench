@@ -7,6 +7,7 @@ from __future__ import (division, absolute_import, print_function,
 import argparse
 from socket import error as sock_error
 import os
+import sys
 import uuid
 from itertools import cycle
 from ftplib import FTP as _FTP, error_temp, error_perm
@@ -339,7 +340,7 @@ def run_bench_download(opts):
 def parse_arguments():
 
     fallback_args = dict(hostname='127.0.0.1',
-                         default=10, maxrun=5, fixevery=5, workdir='/')
+                         default=10, maxrun=5, fixevery=5)
 
     parser = argparse.ArgumentParser(description='FTP Benchmark 1.1')
     parser.add_argument('--hostname',
@@ -377,7 +378,7 @@ def parse_arguments():
     parser.add_argument('--workdir',
                         '-w',
                         help='Base ftp dir to store test files',
-                        default=fallback_args['workdir'])
+                        required='--upload' in " ".join(sys.argv) or '--download' in " ".join(sys.argv))
     parser.add_argument('--size',
                         '-s',
                         help='Size of test files in MB [default: 10]',
