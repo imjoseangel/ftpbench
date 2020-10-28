@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-    name="ftpbench",
-    version="1.1",
-    packages=["ftpbench"],
-    url="http://github.com/imjoseangel/ftpbench",
+    name="ftpbenchmark",
+    version="1.0",
+    packages=["ftpbenchmark"],
+    url="http://github.com/imjoseangel/ftpbenchmark",
     license="MIT",
     author="Jose Angel Munoz",
     author_email="josea.munoz@gmail.com",
@@ -29,9 +29,9 @@ setup(
         "Topic :: Utilities",
     ],
     install_requires=[
-        "setuptools", "gevent", "dnspython", "Timecard", "docopt"
+        "setuptools", "gevent", "dnspython", "Timecard"
     ],
     entry_points={
-        "console_scripts": ["ftpbench = ftpbench.ftpbench:main"]
+        "console_scripts": ["ftpbenchmark = ftpbenchmark.ftpbenchmark:main"]
     }
 )
