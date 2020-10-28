@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="ftpbenchmark",
-    version="1.0.1",
+    version="1.0.2",
     packages=["ftpbenchmark"],
     url="http://github.com/imjoseangel/ftpbenchmark",
     license="MIT",
