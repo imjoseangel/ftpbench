@@ -12,6 +12,7 @@ import uuid
 from itertools import cycle
 from ftplib import FTP as _FTP, error_temp, error_perm
 from contextlib import contextmanager
+import timecard
 from gevent.pool import Pool
 from gevent import Timeout
 import gevent
@@ -23,13 +24,8 @@ try:
 except ImportError:
     resolver = None
 
-try:
-    from timecard import *
-except ImportError:  # for standalone
-    from .timecard import *
 
-
-class Data(object):
+class Data():
     chunk = "x" * 65536
 
     def __init__(self, size):
@@ -52,7 +48,7 @@ class Data(object):
             return self.chunk[:tosend]
 
 
-class FTP(object):
+class FTP():
 
     def __init__(self, host, user, password, timeout, stats):
         self.hosts = host.split(",")
@@ -61,9 +57,9 @@ class FTP(object):
         self.timeout = timeout
         self.stats = stats
         if len(self.hosts) > 1:
-            self.stats.server = MultiMetric("server")
+            self.stats.server = timecard.MultiMetric("server")
             for h in self.hosts:
-                self.stats.server[h] = Int(h)
+                self.stats.server[h] = timecard.Int(h)
         self.upload_files = []
 
         if len(self.hosts) > 1:
@@ -116,7 +112,8 @@ class FTP(object):
                     print("\n\n\rUpload Process: {0}".format(e))
                     sys.exit()
         except ConnectionRefusedError as e:
-            print("Cannot connect to {}".format(self.host))
+            print("\n\n\r{0}. Cannot connect to {1}".format(
+                e, self.host))
             sys.exit(1)
         except (KeyboardInterrupt, Timeout):
             sys.exit()
@@ -139,7 +136,7 @@ class FTP(object):
                     channel.close()
                     ftp.voidresp()
         except ConnectionRefusedError as e:
-            print("Cannot connect to {}".format(self.host))
+            print("\n\n\r{0}. Cannot connect to {1}".format(e, self.host))
             sys.exit(1)
         except (KeyboardInterrupt, Timeout):
             sys.exit()
@@ -154,20 +151,20 @@ class FTP(object):
 
 
 def run_bench_login(opts):
-    stats = Timecard(opts["csvfilename"])
-    stats.time = AutoDateTime(show_date=False)
-    stats.requests = TotalAndSec("request")
-    stats.success = TotalAndSec("success")
-    stats.latency = Timeit("latency", limits=[1, 2, 5])
-    stats.fail = MultiMetric("fails-total")
-    stats.fail.timeout = Int("timeout")
-    stats.fail.rejected = Int("rejected")
+    stats = timecard.Timecard(opts["csvfilename"])
+    stats.time = timecard.AutoDateTime(show_date=False)
+    stats.requests = timecard.TotalAndSec("request")
+    stats.success = timecard.TotalAndSec("success")
+    stats.latency = timecard.Timeit("latency", limits=[1, 2, 5])
+    stats.fail = timecard.MultiMetric("fails-total")
+    stats.fail.timeout = timecard.Int("timeout")
+    stats.fail.rejected = timecard.Int("rejected")
 
     ftp = FTP(
         opts["host"], opts["user"], opts["password"],
         opts["timeout"], stats=stats)
 
-    print("\n\rStart login benchmark: concurrent={} timeout={}s maxrun={}m\n\r".format(
+    print("\n\rStart login benchmark: concurrent={0} timeout={1}s maxrun={2}m\n\r".format(
         opts["concurrent"], opts["timeout"], opts["maxrun"]
     ))
 
@@ -216,15 +213,15 @@ def run_bench_login(opts):
 
 
 def run_bench_upload(opts):
-    stats = Timecard(opts["csvfilename"])
-    stats.time = AutoDateTime(show_date=False)
-    stats.request = MultiMetric("request")
-    stats.request.total = Int("total")
-    stats.request.complete = Int("complete")
-    stats.request.timeout = Int("timeout")
-    stats.request.rejected = Int("rejected")
-    stats.traffic = Traffic("traffic")
-    stats.uploadtime = Timeit("upload-time")
+    stats = timecard.Timecard(opts["csvfilename"])
+    stats.time = timecard.AutoDateTime(show_date=False)
+    stats.request = timecard.MultiMetric("request")
+    stats.request.total = timecard.Int("total")
+    stats.request.complete = timecard.Int("complete")
+    stats.request.timeout = timecard.Int("timeout")
+    stats.request.rejected = timecard.Int("rejected")
+    stats.traffic = timecard.Traffic("traffic")
+    stats.uploadtime = timecard.Timeit("upload-time")
 
     ftp = FTP(
         opts["host"], opts["user"], opts["password"],
@@ -232,7 +229,7 @@ def run_bench_upload(opts):
     )
 
     print(
-        "\n\rStart upload benchmark: concurrent={} timeout={}s size={}MB\n\r"
+        "\n\rStart upload benchmark: concurrent={0} timeout={1}s size={2}MB\n\r"
         "".format(opts["concurrent"], opts["timeout"], opts["size"])
     )
 
@@ -283,15 +280,15 @@ def run_bench_upload(opts):
 
 
 def run_bench_download(opts):
-    stats = Timecard(opts["csvfilename"])
-    stats.time = AutoDateTime(show_date=False)
-    stats.request = MultiMetric("request")
-    stats.request.total = Int("total")
-    stats.request.complete = Int("complete")
-    stats.request.timeout = Int("timeout")
-    stats.request.rejected = Int("rejected")
-    stats.traffic = Traffic("traffic")
-    stats.downloadtime = Timeit("download-time")
+    stats = timecard.Timecard(opts["csvfilename"])
+    stats.time = timecard.AutoDateTime(show_date=False)
+    stats.request = timecard.MultiMetric("request")
+    stats.request.total = timecard.Int("total")
+    stats.request.complete = timecard.Int("complete")
+    stats.request.timeout = timecard.Int("timeout")
+    stats.request.rejected = timecard.Int("rejected")
+    stats.traffic = timecard.Traffic("traffic")
+    stats.downloadtime = timecard.Timeit("download-time")
 
     ftp = FTP(
         opts["host"], opts["user"], opts["password"],
@@ -309,8 +306,8 @@ def run_bench_download(opts):
     filesiter = cycle(ftp.upload_files)
 
     print(
-        "\n\rStart download benchmark: concurrent={} timeout={}s size={}MB"
-        " filecount={}\n\r"
+        "\n\rStart download benchmark: concurrent={0} timeout={1}s size={2}MB"
+        " filecount={3}\n\r"
         "".format(
             opts["concurrent"], opts["timeout"], opts["size"],
             opts["countfiles"])
@@ -400,7 +397,8 @@ def parse_arguments():
     parser.add_argument('--workdir',
                         '-w',
                         help='Base ftp dir to store test files',
-                        required='--upload' in " ".join(sys.argv) or '--download' in " ".join(sys.argv))
+                        required='--upload' in " ".join(sys.argv) or
+                        '--download' in " ".join(sys.argv))
     parser.add_argument('--size',
                         '-s',
                         help='Size of test files in MB [default: 10]',
@@ -443,7 +441,7 @@ def main():
         opts["csvfilename"] = args.csv
         opts["fixevery"] = int(args.fixevery)
         opts["countfiles"] = int(args.files)
-    except Exception as e:
+    except EnvironmentError as e:
         print(e.message)
     else:
         if args.login:
@@ -452,6 +450,8 @@ def main():
             run_bench_upload(opts)
         elif args.download:
             run_bench_download(opts)
+        else:
+            sys.exit(1)
 
 
 if __name__ == '__main__':
