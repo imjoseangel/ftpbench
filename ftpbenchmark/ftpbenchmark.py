@@ -99,18 +99,22 @@ class FTP(object):
             with self.connect() as ftp:
                 self.upload_files.append(path)
 
-                with Timeout(self.timeout):
-                    ftp.voidcmd("TYPE I")  # binary mode
-                    channel = ftp.transfercmd("STOR " + path)
-
-                for chunk in data:
+                try:
                     with Timeout(self.timeout):
-                        channel.sendall(bytes(chunk, encoding='utf8'))
-                        self.stats.traffic += len(chunk)
+                        ftp.voidcmd("TYPE I")  # binary mode
+                        channel = ftp.transfercmd("STOR " + path)
 
-                with Timeout(self.timeout):
-                    channel.close()
-                    ftp.voidresp()
+                    for chunk in data:
+                        with Timeout(self.timeout):
+                            channel.sendall(bytes(chunk, encoding='utf8'))
+                            self.stats.traffic += len(chunk)
+
+                    with Timeout(self.timeout):
+                        channel.close()
+                        ftp.voidresp()
+                except error_perm as e:
+                    print("\n\n\rUpload Process: {0}".format(e))
+                    sys.exit()
         except ConnectionRefusedError as e:
             print("Cannot connect to {}".format(self.host))
             sys.exit(1)
@@ -141,9 +145,12 @@ class FTP(object):
             sys.exit()
 
     def clean(self):
-        with self.connect() as ftp:
-            for path in self.upload_files:
-                ftp.delete(path)
+        try:
+            with self.connect() as ftp:
+                for path in self.upload_files:
+                    ftp.delete(path)
+        except error_perm as e:
+            print("\n\n\rDownload Process: {0}".format(e))
 
 
 def run_bench_login(opts):
