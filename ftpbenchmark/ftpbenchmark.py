@@ -105,7 +105,7 @@ class FTP(object):
 
                 for chunk in data:
                     with Timeout(self.timeout):
-                        channel.sendall(chunk)
+                        channel.sendall(bytes(chunk, encoding='utf8'))
                         self.stats.traffic += len(chunk)
 
                 with Timeout(self.timeout):
@@ -114,23 +114,31 @@ class FTP(object):
         except ConnectionRefusedError as e:
             print("Cannot connect to {}".format(self.host))
             sys.exit(1)
+        except (KeyboardInterrupt, Timeout):
+            sys.exit()
 
-    def donwload(self, path):
-        with self.connect() as ftp:
-            with Timeout(self.timeout):
-                ftp.voidcmd("TYPE I")  # binary mode
-                channel = ftp.transfercmd("RETR " + path)
-
-            while True:
+    def download(self, path):
+        try:
+            with self.connect() as ftp:
                 with Timeout(self.timeout):
-                    chunk = channel.recv(65536)
-                    if not chunk:
-                        break
-                    self.stats.traffic += len(chunk)
+                    ftp.voidcmd("TYPE I")  # binary mode
+                    channel = ftp.transfercmd("RETR " + path)
 
-            with Timeout(self.timeout):
-                channel.close()
-                ftp.voidresp()
+                while True:
+                    with Timeout(self.timeout):
+                        chunk = channel.recv(65536)
+                        if not chunk:
+                            break
+                        self.stats.traffic += len(chunk)
+
+                with Timeout(self.timeout):
+                    channel.close()
+                    ftp.voidresp()
+        except ConnectionRefusedError as e:
+            print("Cannot connect to {}".format(self.host))
+            sys.exit(1)
+        except (KeyboardInterrupt, Timeout):
+            sys.exit()
 
     def clean(self):
         with self.connect() as ftp:
@@ -152,8 +160,8 @@ def run_bench_login(opts):
         opts["host"], opts["user"], opts["password"],
         opts["timeout"], stats=stats)
 
-    print("\n\rStart login benchmark: concurrent={} timeout={}s\n\r".format(
-        opts["concurrent"], opts["timeout"]
+    print("\n\rStart login benchmark: concurrent={} timeout={}s maxrun={}m\n\r".format(
+        opts["concurrent"], opts["timeout"], opts["maxrun"]
     ))
 
     stats.write_headers()
@@ -173,8 +181,11 @@ def run_bench_login(opts):
         stats.requests += 1
         try:
             with stats.latency():
-                with ftp.connect():
-                    pass
+                try:
+                    with ftp.connect():
+                        pass
+                except (KeyboardInterrupt, Timeout):
+                    sys.exit(0)
         except Timeout:
             stats.fail.timeout += 1
         except (error_temp, error_perm, sock_error):
@@ -315,7 +326,7 @@ def run_bench_download(opts):
         stats.request.total += 1
         try:
             with stats.downloadtime():
-                ftp.donwload(next(filesiter))
+                ftp.download(next(filesiter))
         except Timeout:
             stats.request.timeout += 1
         except (error_temp, error_perm, sock_error):
