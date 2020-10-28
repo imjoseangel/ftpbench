@@ -95,21 +95,25 @@ class FTP(object):
             ftp.close()
 
     def upload(self, path, data):
-        with self.connect() as ftp:
-            self.upload_files.append(path)
+        try:
+            with self.connect() as ftp:
+                self.upload_files.append(path)
 
-            with Timeout(self.timeout):
-                ftp.voidcmd("TYPE I")  # binary mode
-                channel = ftp.transfercmd("STOR " + path)
-
-            for chunk in data:
                 with Timeout(self.timeout):
-                    channel.sendall(chunk)
-                    self.stats.traffic += len(chunk)
+                    ftp.voidcmd("TYPE I")  # binary mode
+                    channel = ftp.transfercmd("STOR " + path)
 
-            with Timeout(self.timeout):
-                channel.close()
-                ftp.voidresp()
+                for chunk in data:
+                    with Timeout(self.timeout):
+                        channel.sendall(chunk)
+                        self.stats.traffic += len(chunk)
+
+                with Timeout(self.timeout):
+                    channel.close()
+                    ftp.voidresp()
+        except ConnectionRefusedError as e:
+            print("Cannot connect to {}".format(self.host))
+            sys.exit(1)
 
     def donwload(self, path):
         with self.connect() as ftp:
