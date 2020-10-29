@@ -224,8 +224,7 @@ def run_bench_upload(args):
 
     ftp = FTPBenchmark(
         args.hostname, args.username, args.password,
-        int(args.timeout), stats=stats
-    )
+        int(args.timeout), stats=stats)
 
     print(
         "\n\rStart upload benchmark: concurrent={0} timeout={1}s size={2}MB\n\r"
@@ -291,8 +290,7 @@ def run_bench_download(args):
 
     ftp = FTPBenchmark(
         args.hostname, args.username, args.password,
-        int(args.timeout), stats=stats
-    )
+        int(args.timeout), stats=stats)
 
     print("Preparing for testing...")
     ftp.timeout = 60
