@@ -13,6 +13,7 @@ import socket
 import sys
 import uuid
 import gevent
+from gevent import pool
 import timecard
 
 __author__ = "Jose Angel Munoz <josea.munoz@gmail.com>"
@@ -148,8 +149,8 @@ class FTPBenchmark():
             print("\n\n\rDownload Process: {0}".format(e))
 
 
-def run_bench_login(opts):
-    stats = timecard.Timecard(opts["csvfilename"])
+def run_bench_login(args):
+    stats = timecard.Timecard(args.csv)
     stats.time = timecard.AutoDateTime(show_date=False)
     stats.requests = timecard.TotalAndSec("request")
     stats.success = timecard.TotalAndSec("success")
@@ -159,11 +160,11 @@ def run_bench_login(opts):
     stats.fail.rejected = timecard.Int("rejected")
 
     ftp = FTPBenchmark(
-        opts["host"], opts["user"], opts["password"],
-        opts["timeout"], stats=stats)
+        args.hostname, args.username, args.password,
+        int(args.timeout), stats=stats)
 
     print("\n\rStart login benchmark: concurrent={0} timeout={1}s maxrun={2}m\n\r".format(
-        opts["concurrent"], opts["timeout"], opts["maxrun"]
+        int(args.concurrent), int(args.timeout), int(args.maxrun)
     ))
 
     stats.write_headers()
@@ -172,7 +173,7 @@ def run_bench_login(opts):
         i = 0
         while True:
             i += 1
-            if i == opts["fixevery"]:
+            if i == int(args.fixevery):
                 stats.write_line(fix=True)
                 i = 0
             else:
@@ -196,9 +197,9 @@ def run_bench_login(opts):
             stats.success += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
+    gr_pool = pool.Pool(size=int(args.concurrent))
     try:
-        with gevent.Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(int(args.maxrun) * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
@@ -210,8 +211,8 @@ def run_bench_login(opts):
         gr_pool.kill()
 
 
-def run_bench_upload(opts):
-    stats = timecard.Timecard(opts["csvfilename"])
+def run_bench_upload(args):
+    stats = timecard.Timecard(args.csv)
     stats.time = timecard.AutoDateTime(show_date=False)
     stats.request = timecard.MultiMetric("request")
     stats.request.total = timecard.Int("total")
@@ -222,13 +223,13 @@ def run_bench_upload(opts):
     stats.uploadtime = timecard.Timeit("upload-time")
 
     ftp = FTPBenchmark(
-        opts["host"], opts["user"], opts["password"],
-        opts["timeout"], stats=stats
+        args.hostname, args.username, args.password,
+        int(args.timeout), stats=stats
     )
 
     print(
         "\n\rStart upload benchmark: concurrent={0} timeout={1}s size={2}MB\n\r"
-        "".format(opts["concurrent"], opts["timeout"], opts["size"])
+        "".format(int(args.concurrent), int(args.timeout), int(args.size))
     )
 
     stats.write_headers()
@@ -237,7 +238,7 @@ def run_bench_upload(opts):
         i = 0
         while True:
             i += 1
-            if i == opts["fixevery"]:
+            if i == int(args.fixevery):
                 stats.write_line(fix=True)
                 i = 0
             else:
@@ -248,8 +249,8 @@ def run_bench_upload(opts):
         stats.request.total += 1
         try:
             path = os.path.join(
-                opts["workdir"], "bench_write-%s" % uuid.uuid1().hex)
-            data = Data(opts["size"] * 1024 * 1024)
+                args.workdir, "bench_write-%s" % uuid.uuid1().hex)
+            data = Data(int(args.size) * 1024 * 1024)
             with stats.uploadtime():
                 ftp.upload(path, data)
         except gevent.Timeout:
@@ -260,9 +261,9 @@ def run_bench_upload(opts):
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
+    gr_pool = gevent.pool.Pool(size=int(args.concurrent))
     try:
-        with gevent.Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(int(args.maxrun) * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
@@ -277,8 +278,8 @@ def run_bench_upload(opts):
         ftp.clean()
 
 
-def run_bench_download(opts):
-    stats = timecard.Timecard(opts["csvfilename"])
+def run_bench_download(args):
+    stats = timecard.Timecard(args.csv)
     stats.time = timecard.AutoDateTime(show_date=False)
     stats.request = timecard.MultiMetric("request")
     stats.request.total = timecard.Int("total")
@@ -289,26 +290,26 @@ def run_bench_download(opts):
     stats.downloadtime = timecard.Timeit("download-time")
 
     ftp = FTPBenchmark(
-        opts["host"], opts["user"], opts["password"],
-        opts["timeout"], stats=stats
+        args.hostname, args.username, args.password,
+        int(args.timeout), stats=stats
     )
 
     print("Preparing for testing...")
     ftp.timeout = 60
-    for _ in range(opts["countfiles"]):
+    for _ in range(int(args.files)):
         path = os.path.join(
-            opts["workdir"], "bench_read-%s" % uuid.uuid1().hex)
-        data = Data(opts["size"] * 1024 * 1024)
+            args.workdir, "bench_read-%s" % uuid.uuid1().hex)
+        data = Data(int(args.size) * 1024 * 1024)
         ftp.upload(path, data)
-    ftp.timeout = opts["timeout"]
+    ftp.timeout = int(args.timeout)
     filesiter = itertools.cycle(ftp.upload_files)
 
     print(
         "\n\rStart download benchmark: concurrent={0} timeout={1}s size={2}MB"
         " filecount={3}\n\r"
         "".format(
-            opts["concurrent"], opts["timeout"], opts["size"],
-            opts["countfiles"])
+            int(args.concurrent), int(args.timeout), int(args.size),
+            int(args.files))
     )
 
     stats.write_headers()
@@ -317,7 +318,7 @@ def run_bench_download(opts):
         i = 0
         while True:
             i += 1
-            if i == opts["fixevery"]:
+            if i == int(args.fixevery):
                 stats.write_line(fix=True)
                 i = 0
             else:
@@ -337,9 +338,9 @@ def run_bench_download(opts):
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
+    gr_pool = gevent.pool.Pool(size=int(args.concurrent))
     try:
-        with gevent.Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(int(args.maxrun) * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
@@ -417,37 +418,24 @@ def main():
 
     try:
         args = parse_arguments()
-        opts = dict()
 
-        opts["host"] = args.hostname
-        if resolver and "," not in opts["host"]:
+        if resolver and "," not in args.hostname:
             try:
                 hosts = []
-                for x in resolver.query(opts["host"], "A"):
+                for x in resolver.query(args.hostname, "A"):
                     hosts.append(x.to_text())
-                opts["host"] = ",".join(hosts)
+                args.hostname = ",".join(hosts)
             except resolver.NXDOMAIN:
                 pass
-
-        opts["user"] = args.username
-        opts["password"] = args.password
-        opts["concurrent"] = int(args.concurrent)
-        opts["timeout"] = int(args.timeout)
-        opts["maxrun"] = int(args.maxrun)
-        opts["size"] = int(args.size)
-        opts["workdir"] = args.workdir
-        opts["csvfilename"] = args.csv
-        opts["fixevery"] = int(args.fixevery)
-        opts["countfiles"] = int(args.files)
     except EnvironmentError as e:
         print(e.message)
     else:
         if args.login:
-            run_bench_login(opts)
+            run_bench_login(args)
         elif args.upload:
-            run_bench_upload(opts)
+            run_bench_upload(args)
         elif args.download:
-            run_bench_download(opts)
+            run_bench_download(args)
         else:
             sys.exit(1)
 
