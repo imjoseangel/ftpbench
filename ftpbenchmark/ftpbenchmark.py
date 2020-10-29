@@ -10,10 +10,9 @@ import os
 import sys
 import uuid
 from itertools import cycle
-from ftplib import FTP as _FTP, error_temp, error_perm
+import ftplib
 from contextlib import contextmanager
 import timecard
-from gevent.pool import Pool
 import gevent
 
 __author__ = "Jose Angel Munoz <josea.munoz@gmail.com>"
@@ -47,7 +46,7 @@ class Data():
             return self.chunk[:tosend]
 
 
-class FTP():
+class FTPBenchmark():
 
     def __init__(self, host, user, password, timeout, stats):
         self.hosts = host.split(",")
@@ -81,7 +80,7 @@ class FTP():
     @contextmanager
     def connect(self):
         with gevent.Timeout(self.timeout):
-            ftp = _FTP(self.host)
+            ftp = ftplib.FTP(self.host)
             ftp.login(self.user, self.password)
 
         try:
@@ -107,7 +106,7 @@ class FTP():
                     with gevent.Timeout(self.timeout):
                         channel.close()
                         ftp.voidresp()
-                except error_perm as e:
+                except ftplib.error_perm as e:
                     print("\n\n\rUpload Process: {0}".format(e))
                     sys.exit()
         except ConnectionRefusedError as e:
@@ -145,7 +144,7 @@ class FTP():
             with self.connect() as ftp:
                 for path in self.upload_files:
                     ftp.delete(path)
-        except error_perm as e:
+        except ftplib.error_perm as e:
             print("\n\n\rDownload Process: {0}".format(e))
 
 
@@ -159,7 +158,7 @@ def run_bench_login(opts):
     stats.fail.timeout = timecard.Int("timeout")
     stats.fail.rejected = timecard.Int("rejected")
 
-    ftp = FTP(
+    ftp = FTPBenchmark(
         opts["host"], opts["user"], opts["password"],
         opts["timeout"], stats=stats)
 
@@ -191,13 +190,13 @@ def run_bench_login(opts):
                     sys.exit(0)
         except gevent.Timeout:
             stats.fail.timeout += 1
-        except (error_temp, error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, sock_error):
             stats.fail.rejected += 1
         else:
             stats.success += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = Pool(size=opts["concurrent"])
+    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
     try:
         with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
@@ -222,7 +221,7 @@ def run_bench_upload(opts):
     stats.traffic = timecard.Traffic("traffic")
     stats.uploadtime = timecard.Timeit("upload-time")
 
-    ftp = FTP(
+    ftp = FTPBenchmark(
         opts["host"], opts["user"], opts["password"],
         opts["timeout"], stats=stats
     )
@@ -255,13 +254,13 @@ def run_bench_upload(opts):
                 ftp.upload(path, data)
         except gevent.Timeout:
             stats.request.timeout += 1
-        except (error_temp, error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, sock_error):
             stats.request.rejected += 1
         else:
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = Pool(size=opts["concurrent"])
+    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
     try:
         with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
@@ -289,7 +288,7 @@ def run_bench_download(opts):
     stats.traffic = timecard.Traffic("traffic")
     stats.downloadtime = timecard.Timeit("download-time")
 
-    ftp = FTP(
+    ftp = FTPBenchmark(
         opts["host"], opts["user"], opts["password"],
         opts["timeout"], stats=stats
     )
@@ -332,13 +331,13 @@ def run_bench_download(opts):
                 ftp.download(next(filesiter))
         except gevent.Timeout:
             stats.request.timeout += 1
-        except (error_temp, error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, sock_error):
             stats.request.rejected += 1
         else:
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = Pool(size=opts["concurrent"])
+    gr_pool = gevent.pool.Pool(size=opts["concurrent"])
     try:
         with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
