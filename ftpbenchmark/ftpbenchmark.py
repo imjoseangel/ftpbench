@@ -14,7 +14,6 @@ from ftplib import FTP as _FTP, error_temp, error_perm
 from contextlib import contextmanager
 import timecard
 from gevent.pool import Pool
-from gevent import Timeout
 import gevent
 
 __author__ = "Jose Angel Munoz <josea.munoz@gmail.com>"
@@ -81,7 +80,7 @@ class FTP():
 
     @contextmanager
     def connect(self):
-        with Timeout(self.timeout):
+        with gevent.Timeout(self.timeout):
             ftp = _FTP(self.host)
             ftp.login(self.user, self.password)
 
@@ -96,16 +95,16 @@ class FTP():
                 self.upload_files.append(path)
 
                 try:
-                    with Timeout(self.timeout):
+                    with gevent.Timeout(self.timeout):
                         ftp.voidcmd("TYPE I")  # binary mode
                         channel = ftp.transfercmd("STOR " + path)
 
                     for chunk in data:
-                        with Timeout(self.timeout):
+                        with gevent.Timeout(self.timeout):
                             channel.sendall(bytes(chunk, encoding='utf8'))
                             self.stats.traffic += len(chunk)
 
-                    with Timeout(self.timeout):
+                    with gevent.Timeout(self.timeout):
                         channel.close()
                         ftp.voidresp()
                 except error_perm as e:
@@ -115,30 +114,30 @@ class FTP():
             print("\n\n\r{0}. Cannot connect to {1}".format(
                 e, self.host))
             sys.exit(1)
-        except (KeyboardInterrupt, Timeout):
+        except (KeyboardInterrupt, gevent.Timeout):
             sys.exit()
 
     def download(self, path):
         try:
             with self.connect() as ftp:
-                with Timeout(self.timeout):
+                with gevent.Timeout(self.timeout):
                     ftp.voidcmd("TYPE I")  # binary mode
                     channel = ftp.transfercmd("RETR " + path)
 
                 while True:
-                    with Timeout(self.timeout):
+                    with gevent.Timeout(self.timeout):
                         chunk = channel.recv(65536)
                         if not chunk:
                             break
                         self.stats.traffic += len(chunk)
 
-                with Timeout(self.timeout):
+                with gevent.Timeout(self.timeout):
                     channel.close()
                     ftp.voidresp()
         except ConnectionRefusedError as e:
             print("\n\n\r{0}. Cannot connect to {1}".format(e, self.host))
             sys.exit(1)
-        except (KeyboardInterrupt, Timeout):
+        except (KeyboardInterrupt, gevent.Timeout):
             sys.exit()
 
     def clean(self):
@@ -188,9 +187,9 @@ def run_bench_login(opts):
                 try:
                     with ftp.connect():
                         pass
-                except (KeyboardInterrupt, Timeout):
+                except (KeyboardInterrupt, gevent.Timeout):
                     sys.exit(0)
-        except Timeout:
+        except gevent.Timeout:
             stats.fail.timeout += 1
         except (error_temp, error_perm, sock_error):
             stats.fail.rejected += 1
@@ -200,11 +199,11 @@ def run_bench_login(opts):
     gr_stats = gevent.spawn(_print_stats)
     gr_pool = Pool(size=opts["concurrent"])
     try:
-        with Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
-    except (KeyboardInterrupt, Timeout):
+    except (KeyboardInterrupt, gevent.Timeout):
         pass
     finally:
         print("\n")
@@ -254,7 +253,7 @@ def run_bench_upload(opts):
             data = Data(opts["size"] * 1024 * 1024)
             with stats.uploadtime():
                 ftp.upload(path, data)
-        except Timeout:
+        except gevent.Timeout:
             stats.request.timeout += 1
         except (error_temp, error_perm, sock_error):
             stats.request.rejected += 1
@@ -264,11 +263,11 @@ def run_bench_upload(opts):
     gr_stats = gevent.spawn(_print_stats)
     gr_pool = Pool(size=opts["concurrent"])
     try:
-        with Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
-    except (KeyboardInterrupt, Timeout):
+    except (KeyboardInterrupt, gevent.Timeout):
         pass
     finally:
         print("\n")
@@ -331,7 +330,7 @@ def run_bench_download(opts):
         try:
             with stats.downloadtime():
                 ftp.download(next(filesiter))
-        except Timeout:
+        except gevent.Timeout:
             stats.request.timeout += 1
         except (error_temp, error_perm, sock_error):
             stats.request.rejected += 1
@@ -341,11 +340,11 @@ def run_bench_download(opts):
     gr_stats = gevent.spawn(_print_stats)
     gr_pool = Pool(size=opts["concurrent"])
     try:
-        with Timeout(opts["maxrun"] * 60 or None):
+        with gevent.Timeout(opts["maxrun"] * 60 or None):
             while True:
                 gr_pool.wait_available()
                 gr_pool.spawn(_check)
-    except (KeyboardInterrupt, Timeout):
+    except (KeyboardInterrupt, gevent.Timeout):
         pass
     finally:
         print("\n")
