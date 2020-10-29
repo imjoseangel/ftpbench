@@ -5,15 +5,15 @@ from __future__ import (division, absolute_import, print_function,
                         unicode_literals)
 
 import argparse
-from socket import error as sock_error
+import contextlib
+import ftplib
+import itertools
 import os
+import socket
 import sys
 import uuid
-from itertools import cycle
-import ftplib
-from contextlib import contextmanager
-import timecard
 import gevent
+import timecard
 
 __author__ = "Jose Angel Munoz <josea.munoz@gmail.com>"
 
@@ -63,7 +63,7 @@ class FTPBenchmark():
         if len(self.hosts) > 1:
 
             def _roundrobin():
-                for h in cycle(self.hosts):
+                for h in itertools.cycle(self.hosts):
                     yield h
             self._host_roundrobin = _roundrobin()
 
@@ -77,7 +77,7 @@ class FTPBenchmark():
             self.stats.server[h] += 1
             return h
 
-    @contextmanager
+    @contextlib.contextmanager
     def connect(self):
         with gevent.Timeout(self.timeout):
             ftp = ftplib.FTP(self.host)
@@ -190,7 +190,7 @@ def run_bench_login(opts):
                     sys.exit(0)
         except gevent.Timeout:
             stats.fail.timeout += 1
-        except (ftplib.error_temp, ftplib.error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, socket.error):
             stats.fail.rejected += 1
         else:
             stats.success += 1
@@ -254,7 +254,7 @@ def run_bench_upload(opts):
                 ftp.upload(path, data)
         except gevent.Timeout:
             stats.request.timeout += 1
-        except (ftplib.error_temp, ftplib.error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, socket.error):
             stats.request.rejected += 1
         else:
             stats.request.complete += 1
@@ -301,7 +301,7 @@ def run_bench_download(opts):
         data = Data(opts["size"] * 1024 * 1024)
         ftp.upload(path, data)
     ftp.timeout = opts["timeout"]
-    filesiter = cycle(ftp.upload_files)
+    filesiter = itertools.cycle(ftp.upload_files)
 
     print(
         "\n\rStart download benchmark: concurrent={0} timeout={1}s size={2}MB"
@@ -331,7 +331,7 @@ def run_bench_download(opts):
                 ftp.download(next(filesiter))
         except gevent.Timeout:
             stats.request.timeout += 1
-        except (ftplib.error_temp, ftplib.error_perm, sock_error):
+        except (ftplib.error_temp, ftplib.error_perm, socket.error):
             stats.request.rejected += 1
         else:
             stats.request.complete += 1
