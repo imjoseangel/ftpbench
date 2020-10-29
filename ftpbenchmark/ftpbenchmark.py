@@ -5,7 +5,7 @@ from __future__ import (division, absolute_import, print_function,
                         unicode_literals)
 
 import argparse
-import contextlib
+from contextlib import contextmanager
 import ftplib
 import itertools
 import os
@@ -78,7 +78,7 @@ class FTPBenchmark():
             self.stats.server[h] += 1
             return h
 
-    @contextlib.contextmanager
+    @contextmanager
     def connect(self):
         with gevent.Timeout(self.timeout):
             ftp = ftplib.FTP(self.host)
@@ -149,23 +149,14 @@ class FTPBenchmark():
             print("\n\n\rDownload Process: {0}".format(e))
 
 
-def run_bench_login(args):
-    stats = timecard.Timecard(args.csv)
-    stats.time = timecard.AutoDateTime(show_date=False)
-    stats.requests = timecard.TotalAndSec("request")
-    stats.success = timecard.TotalAndSec("success")
-    stats.latency = timecard.Timeit("latency", limits=[1, 2, 5])
-    stats.fail = timecard.MultiMetric("fails-total")
-    stats.fail.timeout = timecard.Int("timeout")
-    stats.fail.rejected = timecard.Int("rejected")
+def run_bench_login(args, stats):
 
     ftp = FTPBenchmark(
         args.hostname, args.username, args.password,
         int(args.timeout), stats=stats)
 
     print("\n\rStart login benchmark: concurrent={0} timeout={1}s maxrun={2}m\n\r".format(
-        int(args.concurrent), int(args.timeout), int(args.maxrun)
-    ))
+        int(args.concurrent), int(args.timeout), int(args.maxrun)))
 
     stats.write_headers()
 
@@ -211,16 +202,7 @@ def run_bench_login(args):
         gr_pool.kill()
 
 
-def run_bench_upload(args):
-    stats = timecard.Timecard(args.csv)
-    stats.time = timecard.AutoDateTime(show_date=False)
-    stats.request = timecard.MultiMetric("request")
-    stats.request.total = timecard.Int("total")
-    stats.request.complete = timecard.Int("complete")
-    stats.request.timeout = timecard.Int("timeout")
-    stats.request.rejected = timecard.Int("rejected")
-    stats.traffic = timecard.Traffic("traffic")
-    stats.uploadtime = timecard.Timeit("upload-time")
+def run_bench_upload(args, stats):
 
     ftp = FTPBenchmark(
         args.hostname, args.username, args.password,
@@ -228,8 +210,7 @@ def run_bench_upload(args):
 
     print(
         "\n\rStart upload benchmark: concurrent={0} timeout={1}s size={2}MB\n\r"
-        "".format(int(args.concurrent), int(args.timeout), int(args.size))
-    )
+        "".format(int(args.concurrent), int(args.timeout), int(args.size)))
 
     stats.write_headers()
 
@@ -272,21 +253,13 @@ def run_bench_upload(args):
         print("\n")
         gr_stats.kill()
         gr_pool.kill()
+
         print("Cleanning...")
         ftp.timeout = 60
         ftp.clean()
 
 
-def run_bench_download(args):
-    stats = timecard.Timecard(args.csv)
-    stats.time = timecard.AutoDateTime(show_date=False)
-    stats.request = timecard.MultiMetric("request")
-    stats.request.total = timecard.Int("total")
-    stats.request.complete = timecard.Int("complete")
-    stats.request.timeout = timecard.Int("timeout")
-    stats.request.rejected = timecard.Int("rejected")
-    stats.traffic = timecard.Traffic("traffic")
-    stats.downloadtime = timecard.Timeit("download-time")
+def run_bench_download(args, stats):
 
     ftp = FTPBenchmark(
         args.hostname, args.username, args.password,
@@ -307,8 +280,7 @@ def run_bench_download(args):
         " filecount={3}\n\r"
         "".format(
             int(args.concurrent), int(args.timeout), int(args.size),
-            int(args.files))
-    )
+            int(args.files)))
 
     stats.write_headers()
 
@@ -351,6 +323,33 @@ def run_bench_download(args):
         print("Cleanning...")
         ftp.timeout = 60
         ftp.clean()
+
+
+def parse_stats(args):
+
+    stats = timecard.Timecard(args.csv)
+    stats.time = timecard.AutoDateTime(show_date=False)
+
+    if args.login:
+        stats.requests = timecard.TotalAndSec("request")
+        stats.success = timecard.TotalAndSec("success")
+        stats.latency = timecard.Timeit("latency", limits=[1, 2, 5])
+        stats.fail = timecard.MultiMetric("fails-total")
+        stats.fail.timeout = timecard.Int("timeout")
+        stats.fail.rejected = timecard.Int("rejected")
+    elif args.upload or args.download:
+        stats.request = timecard.MultiMetric("request")
+        stats.request.total = timecard.Int("total")
+        stats.request.complete = timecard.Int("complete")
+        stats.request.timeout = timecard.Int("timeout")
+        stats.request.rejected = timecard.Int("rejected")
+        stats.traffic = timecard.Traffic("traffic")
+        if args.upload:
+            stats.uploadtime = timecard.Timeit("upload-time")
+        else:
+            stats.downloadtime = timecard.Timeit("download-time")
+
+    return stats
 
 
 def parse_arguments():
@@ -416,6 +415,7 @@ def main():
 
     try:
         args = parse_arguments()
+        stats = parse_stats(args)
 
         if resolver and "," not in args.hostname:
             try:
@@ -429,11 +429,11 @@ def main():
         print(e.message)
     else:
         if args.login:
-            run_bench_login(args)
+            run_bench_login(args, stats)
         elif args.upload:
-            run_bench_upload(args)
+            run_bench_upload(args, stats)
         elif args.download:
-            run_bench_download(args)
+            run_bench_download(args, stats)
         else:
             sys.exit(1)
 
