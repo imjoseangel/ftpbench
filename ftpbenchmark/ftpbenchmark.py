@@ -261,7 +261,7 @@ def run_bench_upload(args):
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = gevent.pool.Pool(size=int(args.concurrent))
+    gr_pool = pool.Pool(size=int(args.concurrent))
     try:
         with gevent.Timeout(int(args.maxrun) * 60 or None):
             while True:
@@ -338,7 +338,7 @@ def run_bench_download(args):
             stats.request.complete += 1
 
     gr_stats = gevent.spawn(_print_stats)
-    gr_pool = gevent.pool.Pool(size=int(args.concurrent))
+    gr_pool = pool.Pool(size=int(args.concurrent))
     try:
         with gevent.Timeout(int(args.maxrun) * 60 or None):
             while True:
